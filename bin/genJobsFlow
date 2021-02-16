@@ -1,0 +1,283 @@
+eval '(exit $?0)' && 
+    eval 'exec perl -S $0 ${1+"$@"}' && 
+    eval 'exec perl -S $0 $argv:q'
+    if 0;
+
+#############################################################################
+#
+#  Generate a random sequence of jobs with requested size distribution
+#
+#  Copyright (C) 2014 TO THE AUTHORS
+#
+# to the blind review this software is available for SigComm evaluation 
+# only. Once accepted it will be published with chioce of GPLv2 and BSD
+# licenses.  
+# You are not allowed to copy or publish this software in any way.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+# NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+# BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+# ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+# CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+# Given:
+# N = number of jobs to generate
+# Sa,Ss = size of jobs avg and stddev
+# Rmin,Rmax = runtime of jobs as uniform distribution [sec]
+# A = arrival rate average Poisson [sec]
+# 
+# Generate a trace file of jobs arriving to the system
+#
+#############################################################################
+
+=head1 TITLE
+
+genJobsFlow - generate incoming jobs by requested statistics
+
+=head1 SYNOPSIS
+
+genJobsFlow -n/--num-jobs num-jobs -s/--size avg:stddev|min:max|S1:R1,S2:R2,S3:R3...Sn:Rn|ExpAvg -r/--runtime min:max-in-sec -a/--arrival rate-in-sec 
+
+=head1 DESCRIPTION
+
+Given:
+num-jobs = number of jobs to generate
+job sizes distribution = either gaussian, uniform or specific values with rates
+runtimr min and max = runtime of jobs as uniform distribution [sec]
+Arrival = arrival rate average Poisson [sec]
+
+Generate a trace file of jobs arriving to the system
+
+=head1 ARGUMENTS
+
+=over 8
+
+=item B<--num-jobs|-n num-jobs>
+
+Number of jobs to generate 
+
+=item B<--size|-s avg:stddev|min:max|S1:R1,S2:R2,S3:R3...Sn:Rn|ExpAvg>
+
+The generated job sizes statistics:
+
+=over 4
+
+=item avg:stddev = Gaussian
+
+=item min:max = Uniform
+
+=item S1:R1,S2:R2,S3:R3...Sn:Rn = PDF
+
+=item ExpAvg = Exponential
+
+=back 4
+
+=item B<--runtime|-r min:max>
+
+A uniform distributed runtime min and max range in seconds
+
+=item B<--arrival|-a rate>
+
+Arrival rate of jobs Poisson rate in sec
+
+=back
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--verbose|-v>
+
+Run in verbose mode
+
+=item B<--help|-h>
+
+Print a brief help message and exits.
+
+=item B<--man|-m>
+
+Print a detailed help message (man) and exits.
+
+=back
+
+=head1 LICENSE
+
+ Due to the blind review this software is available for SigComm evaluation 
+ only. Once accepted it will be published with chioce of GPLv2 and BSD
+ licenses.  
+ You are not allowed to copy or publish this software in any way.
+
+ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+ BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ SOFTWARE.
+
+=head1 Revision
+
+$Revision$
+
+=head1 AUTHOR
+
+Copyright (C) 2014 TO THE AUTHORS
+
+=cut
+
+#############################################################################
+#
+# Commands line parsing
+# 
+
+use vars qw($VERSION);
+
+# use RCS info as we reposit in RCS
+($VERSION) = ('$Revision$' =~ m/(.*)/);
+
+use strict;
+use warnings;
+use diagnostics;
+use Getopt::Long;
+use Pod::Usage;
+use Math::Random qw(random_normal random_uniform random_exponential random_uniform_integer);
+use Math::Round;
+use List::Util qw(shuffle);
+
+my $opt_verbose = 0;
+my ($opt_help, $opt_man);
+my $opt_n;
+my $opt_s;
+my $opt_eAvg;
+my $opt_sAvg;
+my $opt_sStd;
+my %opt_valProb;
+my @SEL_VALS;
+my $opt_r;
+my $opt_rMin;
+my $opt_rMax;
+my $opt_a;
+
+my $cmd = join(" ", @ARGV);
+
+GetOptions(
+    'n|num-jobs=s'  => \$opt_n,
+    's|size=s'      => \$opt_s,
+    'r|runtime=s'   => \$opt_r,
+    'a|arrival=s'   => \$opt_a,
+    'v|verbose'     => \$opt_verbose,
+    'h|help'        => \$opt_help,
+    'm|man'         => \$opt_man,
+    ) or pod2usage(-verbose => 1) && exit;
+
+pod2usage(-verbose => 1) && exit if defined $opt_help;
+pod2usage(-verbose => 2) && exit if defined $opt_man;
+
+# Replace the below with a check for mandatory arguments
+pod2usage("$0: Missing mandatory arguments.") && exit
+    if (! (defined($opt_n) && defined($opt_s) && defined($opt_r)
+           && defined($opt_a) ));
+
+if ($opt_s =~ m/^([0-9]+)$/) {
+    ($opt_eAvg) = ($1);
+    print STDERR  "-I- Size Exponential($opt_eAvg)\n";    
+} elsif ($opt_s =~ m/^([0-9]+):([0-9]+)$/) {
+    ($opt_sAvg, $opt_sStd) = ($1,$2);
+    print STDERR  "-I- Size Gaussian($opt_sAvg,$opt_sStd)\n";    
+} elsif ($opt_s =~ m/^([0-9]+):([0-9.]+)(,([0-9]+):([0-9.]+))+$/) {
+    my $sr = 0;
+    while ($opt_s =~ m/([0-9]+):([0-9.]+)/g) {
+        my ($s,$r) = ($1,$2);
+        $opt_valProb{$s} = $r;
+        $sr += $r;
+    }
+    foreach my $v (sort {$a <=>$b} (keys(%opt_valProb))) {
+        $opt_valProb{$v} *= 1/$sr;
+        print STDERR "-I- Generating Value: $v with Probability: $opt_valProb{$v}\n";
+        for (my $i = 0; $i < $opt_valProb{$v}*1000; $i++) {
+            push @SEL_VALS, $v;
+        }
+    }
+    my $nVals = @SEL_VALS;
+    print STDERR  "-I- Size PDF of $nVals values\n";    
+} else {
+    print "-E- Option -s $opt_a must be formatted avg:stddev.\n";
+    exit(1)
+}
+
+if ($opt_r =~ m/^([0-9]+):([0-9]+)$/) {
+    ($opt_rMin, $opt_rMax) = ($1,$2);
+    if ($opt_rMin > $opt_rMax) {
+        my $tmp = $opt_rMin;
+        $opt_rMin = $opt_rMax;
+        $opt_rMax = $tmp;
+    }
+} else {
+    print "-E- Option -r $opt_a must be formatted min:min .\n";
+    exit(1)
+}
+
+#############################################################################
+#
+# Main Flow
+# 
+
+#print "-I- $cmd\n";
+
+my @SIZES;
+my $sizeFix = 0;
+
+# selecting a random set of sizes...
+if (scalar(@SEL_VALS)) {
+    print STDERR  "-I- Size = Relative Prob of Given values: $opt_s\n";
+    my @SIZES_IDX = random_uniform_integer($opt_n, 0, scalar(@SEL_VALS)-1);
+    for (my $i = 0; $i < $opt_n; $i++) {
+        $SIZES[$i] = $SEL_VALS[$SIZES_IDX[$i]];
+    }
+} elsif (defined($opt_eAvg)) {
+    @SIZES = Math::Random::random_exponential($opt_n, $opt_eAvg);
+    for (my $i = 0; $i < scalar(@SIZES);$i++) {
+        if ($SIZES[$i] <= 1) {
+            $SIZES[$i] = $opt_eAvg;
+        }
+    }
+} elsif ($opt_sAvg > $opt_sStd) {
+    print STDERR  "-I- Size = Normal($opt_sAvg, $opt_sStd)\n";
+    @SIZES = random_normal($opt_n, $opt_sAvg, $opt_sStd);
+    # but do not want to allow any negative values
+    for (my $i = 0; $i < scalar(@SIZES);$i++) {
+        if ($SIZES[$i] <= 1) {
+            $SIZES[$i] = $opt_sAvg;
+            $sizeFix++;
+        }
+    }
+    print STDERR  "-I- Fixed $sizeFix sizes\n";    
+} else {
+    print STDERR  "-I- Size = Uniform($opt_sAvg, $opt_sStd)\n";
+    @SIZES = random_uniform($opt_n, $opt_sAvg, $opt_sStd);
+}
+
+print STDERR  "-I- RunTime = Uniform($opt_rMin, $opt_rMax)\n";
+my @RUNTIMES = random_uniform($opt_n, $opt_rMin, $opt_rMax);
+my @ARRIVALS = Math::Random::random_exponential($opt_n, $opt_a);
+if ($opt_a < 1) {
+    for (my $i = 0; $i < $opt_n; $i++) {
+        $ARRIVALS[$i] = 0;
+    }
+    print STDERR  "-I- All Jobs Exists in T=0\n";
+}
+
+#print "job-id, size, arrival-time, run-time\n";
+my $t = 0;
+for(my $j = 0 ; $j < $opt_n; $j++) {
+    printf("%d, %d, %d, %d\n", $j+1, $SIZES[$j], $t, $RUNTIMES[$j]);
+    # since it takes time to warm up the system we do not wait for
+    # system size/avg ...
+    $t += $ARRIVALS[$j];
+}
+
+

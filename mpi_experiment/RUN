@@ -1,0 +1,14 @@
+#!/bin/bash
+for s in 32 64 96 128 256; do
+   m=`expr 1024 \* $s`
+   k=`echo "sqrt($s)"|bc`
+   t=`expr 400000 / $k`
+   echo "#########################################################################################"
+   echo "running in parallel $t iters of $m size"
+   for i in `seq 1 4`; do
+      /home/ezahavi/Work/mvapich2-2.0rc2/usr/bin/mpirun -n 8 -hostfile hostfile_8n.j$i ./stencil_iters $t $m parallel-run-job-$i-$m &
+      sleep 5
+   done
+   wait
+done
+exit

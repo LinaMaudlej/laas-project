@@ -1,0 +1,286 @@
+Links as a Service
+==================
+
+This software package contains a simulator and a service of LaaS that are built on 
+top of the core algorithm.
+
+The LaaS Service provides Restful interface and serves tenant requessts.
+It outputs OpenStack command files required to control tenant host placement and also
+provides SDN configuration files to enforce isolation via packet routing/forwarding.
+
+The simulator takes a CSV file with tenant requests (id, size and arrival time) and process them
+in a FIFO manner.
+
+License:
+--------
+Please read the LICENSE file.
+
+Content:
+--------
+The following sub directories are included in this release:
+src - The core algorithm c++ and python service/simulator
+bin - random tenants generator and isol.log checker
+examples - a set of files used by the demo below
+
+Out of the entire set of source files, the one most interesting for integration is
+lass.h which provides tha API exposed in Python.
+
+Software dependency:
+--------------------
+Ubuntu 12.04 or later
+SWIG Version 2.0.11
+Python 2.7
+Python 2.7 Flask 0.7
+Python 2.7 Flask Restful 0.3.1
+
+The Perl code (for utilities only) provided depends on:
+Perl v5.18.2
+Perl Math::Random 0.71
+Perl Math::Round 0.07
+
+Installation:
+-------------
+
+cd src
+make
+
+Running LaaS Service:
+---------------------
+
+0. Decide your cluster topology:
+   For alowing us to draw the network and ease of review we choose a small 2 level fat tree.
+   The data needed to run a larger topology is also included in the exmples directory.
+   So example topology is XGFT(2; 4,8; 1,4) but due to limitation of the current implementation
+   we represent it as if it was a 3 level fat tree with one top subtree: XGFT(3; 4,8,1; 1,4,1)
+
+1. Prepare name mapping file:
+   The LaaS engine eventually need to configure OpenStack and SDN controller that rely on
+   physical naming and port numbering and not on general fat-tree indexing. A file that 
+   provides mapping of the tree level, index within the tree and port indexing to the actual built 
+   topology is requierd. For this topology we provide an example file: examples/pgft_m4_8_w1_4.csv.
+   
+   The first line hint about the content of each column:
+   # lvl,swIdx,name,UP,upPorts,DN,dnPorts
+
+   The example line below describes a host, providing its level is 0 and index is 10, its name is comp-11
+   and it has a single UP port 1 conneting to L1 switch (on level 1).
+   0,10,comp-11,UP,1,,,,,,,,,,,,,,,,,,,,,,,,
+
+   An example L1 switch line is provided below. See this is the 4th switch in L1, 
+   its name as recognized by the SDN controller is SW_L1_3 and its ports 5-8 are connecting to hosts.
+   1,3,SW_L1_3,UP,1,2,3,4,DN,5,6,7,8
+
+   Note: The file does not include any mapping for the non existant level 3 switches.
+
+2. Start the service:
+   Once started it reports its address and port. 
+   The Restful API is up and any change in tenant status will result in updates in the
+   OSCfg/ and SDNCfg/ directories.
+
+   $ python ./src/laas_service.py -n examples/pgft_m4_8_w1_4.csv -m 4,8,1 -w 1,4,1	   
+   -I- Defined 64 up ports and 64 down port mappings				   
+   										   
+    * Running on http://127.0.0.1:12345/						   
+    * Restarting with reloader							   
+   -I- Defined 64 up ports and 64 down port mappings 
+
+3. Run a demo:
+   We provide here an example sequence of calls to the service. 
+   After each step we discuss the results and the created files if any.
+
+   a. List tenants:
+   | $ curl http://localhost:12345/tenants
+   | {}
+   As expeted returns an empty list
+
+   b. Create a tenant of 10 nodes (expecting it will span 2.5 leafs):
+   | $ curl http://localhost:12345/tenants -d "id=4" -d "n=10" -X POST 
+   | {
+   |	"N": 10, 
+   | 	"hosts": 10, 
+   |  	"l1Ports": 10, 
+   |	"l2Ports": 0
+   | }
+   See how the tenant-id may be any number non existing in the system
+
+   Let's inspect the created files. First see the new file in the OSCfg: 
+   cmd-1.log: 
+   | #!/bin/bash
+   | #
+   | # Adding tenant 4 to OpenStack
+   | #
+   | echo Adding tenant 4 to OpenStack > OSCfg/cmd-1.log
+   | keystone tenant-create --name laas-tenant-4 --description "LaaS Tenant 4" >> OSCfg/cmd-1.log
+   | tenantId=`keystone tenant-get laas-tenant-4 | awk '/ id /{print $4}'` >> OSCfg/cmd-1.log
+   | nova aggregate-create laas-aggr-4 >> OSCfg/cmd-1.log
+   | nova aggregate-set-metadata laas-aggr-4 filter_tenant_id=$tenantId >> OSCfg/cmd-1.log
+   | nova aggregate-add-host laas-aggr-4 comp-1 >> cmd-1.log
+   | nova aggregate-add-host laas-aggr-4 comp-2 >> cmd-1.log
+   | nova aggregate-add-host laas-aggr-4 comp-3 >> cmd-1.log
+   | nova aggregate-add-host laas-aggr-4 comp-4 >> cmd-1.log
+   | nova aggregate-add-host laas-aggr-4 comp-5 >> cmd-1.log
+   | nova aggregate-add-host laas-aggr-4 comp-6 >> cmd-1.log
+   | nova aggregate-add-host laas-aggr-4 comp-7 >> cmd-1.log
+   | nova aggregate-add-host laas-aggr-4 comp-8 >> cmd-1.log
+   | nova aggregate-add-host laas-aggr-4 comp-9 >> cmd-1.log
+   | nova aggregate-add-host laas-aggr-4 comp-10 >> cmd-1.log
+   
+   Similarly the SDNCfg/ directory now hold a full set of configuration files
+   required for OpenSM to configure the network. We will not go through the
+   full description of these files. See the groups.conf hold the definition
+   of the hosts and switch ports used by the first tenent:
+   | port-group
+   | name: T4-hcas
+   | obj_list: 
+   |    name=comp-1/U1:P1
+   |    name=comp-2/U1:P1
+   |    name=comp-3/U1:P1
+   |    name=comp-4/U1:P1
+   |    name=comp-5/U1:P1
+   |    name=comp-6/U1:P1
+   |    name=comp-7/U1:P1
+   |    name=comp-8/U1:P1
+   |    name=comp-9/U1:P1
+   |    name=comp-10/U1:P1;
+   | end-port-group
+   | 
+   | port-group
+   | name: T4-switches
+   | obj_list: 
+   |    name=SW_L1_2/U1 pmask=0x6
+   |    name=SW_L1_0/U1 pmask=0x1e
+   |    name=SW_L1_1/U1 pmask=0x1e;
+   | end-port-group
+
+   c. To fill in the network we create another 10 nodes tenent:
+   | $ curl http://localhost:12345/tenants -d "id=1" -d "n=10" -X POST 
+   | {
+   |	"N": 10, 
+   | 	"hosts": 10, 
+   |  	"l1Ports": 10, 
+   |	"l2Ports": 0
+   | }
+
+   d. List again the tenants:
+   | $ curl http://localhost:12345/tenants
+   | {
+   |     "1": {
+   |         "N": 10, 
+   |         "hosts": 10, 
+   |         "l1Ports": 10, 
+   |         "l2Ports": 0
+   |     }, 
+   |     "4": {
+   |         "N": 10, 
+   |         "hosts": 10, 
+   |         "l1Ports": 10, 
+   |         "l2Ports": 0
+   |     }
+   | }
+
+   e. The Restful API allows for obtaining the allocated hosts and links for specific tenant:
+   | $ curl http://localhost:12345/tenants/1/hosts
+   | [
+   |     "comp-11", 
+   |     "comp-12", 
+   |     "comp-13", 
+   |     "comp-14", 
+   |     "comp-15", 
+   |     "comp-16", 
+   |     "comp-17", 
+   |     "comp-18", 
+   |     "comp-19", 
+   |     "comp-20"
+   | ]
+
+   As expected the four spines are going to be used (all up ports of 2 leafs) 
+   and only 2 ports of the leaf SW_L1_2 holding just 2 nodes.
+   | $ curl http://localhost:12345/tenants/1/l1Ports
+   | [
+   |     { "pNum": 3, "sName": "SW_L1_2" }, 
+   |     { "pNum": 4, "sName": "SW_L1_2" }, 
+   |     { "pNum": 1, "sName": "SW_L1_3" }, 
+   |     { "pNum": 2, "sName": "SW_L1_3" }, 
+   |     { "pNum": 3, "sName": "SW_L1_3" }, 
+   |     { "pNum": 4, "sName": "SW_L1_3" }, 
+   |     { "pNum": 1, "sName": "SW_L1_4" }, 
+   |     { "pNum": 2, "sName": "SW_L1_4" }, 
+   |     { "pNum": 3, "sName": "SW_L1_4" }, 
+   |     { "pNum": 4, "sName": "SW_L1_4" }
+   | ]
+
+   f. Now let's see what happen if we try to over provision the cluster
+      by requesting a tenant of 32-20+1 nodes:
+   | $ curl http://localhost:12345/tenants -d "id=2" -d "n=13" -X POST
+   | {
+   |     "message": "Fail to allocate tenant 2"
+   | }
+
+   g. Delete tenant 1
+   | $ curl http://localhost:12345/tenants/1 -X DELETE
+
+   See that we now have a command file that deletes the OpenStack tenant and aggregate
+   | #!/bin/bash
+   | #
+   | # Removing tenant 1 from OpenStack
+   | #
+   | nova aggregate-remove-host laas-aggr-1 comp-11 >> cmd-3.log
+   | nova aggregate-remove-host laas-aggr-1 comp-12 >> cmd-3.log
+   | nova aggregate-remove-host laas-aggr-1 comp-13 >> cmd-3.log
+   | nova aggregate-remove-host laas-aggr-1 comp-14 >> cmd-3.log
+   | nova aggregate-remove-host laas-aggr-1 comp-15 >> cmd-3.log
+   | nova aggregate-remove-host laas-aggr-1 comp-16 >> cmd-3.log
+   | nova aggregate-remove-host laas-aggr-1 comp-17 >> cmd-3.log
+   | nova aggregate-remove-host laas-aggr-1 comp-18 >> cmd-3.log
+   | nova aggregate-remove-host laas-aggr-1 comp-19 >> cmd-3.log
+   | nova aggregate-remove-host laas-aggr-1 comp-20 >> cmd-3.log
+   | nova aggregate-delete laas-aggr-1 >> OSCfg/cmd-3.log
+   | keystone tenant-delete laas-tenant-1 >> OSCfg/cmd-3.log
+
+   i. Retry allocating the 13 nodes tenant
+   | $ curl http://localhost:12345/tenants -d "id=2" -d "n=13" -X POST
+   | {
+   |     "N": 13, 
+   |     "hosts": 13, 
+   |     "l1Ports": 13, 
+   |     "l2Ports": 0
+   | }
+
+Running Simulation of LaaS algorithm:
+-------------------------------------
+0. Decide your cluster topology:
+   For example the maximal full bisection 3 level XGFT with 36 port switches is:
+   XGFT(3; 18,18,36; 1,18,18)
+   It has 11628 hosts, 648 L1, 648 L2 and 324 L3 switches.
+
+1. Generate a set of tenant requests using bin/genJobsFlow:
+   For this example we use exponential distribution of average of 8 hosts.
+   The tenant run time is uniformly distributed in the range [20,3000].
+   Please try --help to see other possible options.
+   ./bin/genJobsFlow -n 10000 -s 8 -r 20:3000 -a 0 > examples/exp=8_tenants=1000_arrival=0.csv
+
+2. Run the simulator (after following the installation procedure above):
+   $ python ./src/sim.py -c examples/exp=8_tenants=1000_arrival=0.csv -m 18,18,36 -w 1,18,18
+   -I- Obtained 10000 jobs					   
+   -I- first waiting job at: 20 lastJobPlacementTime 10623	   
+   -I- Total potential hosts * time = 1.23673e+08 		   
+   -I- Total considered jobs: 9976 skip first: 0 last: 24	   
+   -I- Total actual hosts * time = 1.17281e+08		   
+   -I- Host Utilization = 94.83 %				   
+   -I- L1 Up Links Utilization  = 38.36 %			   
+   -I- L2 Up Links Utilization  = 10.70 %			   
+   -I- Total Links Utilization  = 48.40 %			   
+   -I- Run Time = 14.2 sec 
+
+    The details of each allocation/deallocation are provided in the log file: isol.log.
+    Each line describes one transaction and contains the total hosts/links as well as 
+    their detailed indexies within the topology.
+
+3. Check the results are legal
+   The checker needs to know the topology size. So it requires this info on the command line:
+   checkAllocations -n/--hosts-per-leaf n -k/--num-l1-per-l2 
+                    -1/--total-l1s -2/--total-l2s -3/--total-l3s -l/--log log-file
+
+   $ ./bin/checkAllocations -n 18 -k 18 -1 648 -2 648 -3 324 -l isol.log 
+   -I- Checked 10000 ADD and 8760 REM jobs
+   -I- Added/Rem 35573/30117 L1PORTS and 567/482 L2PORTS
