@@ -96,7 +96,10 @@ import heapq
 
 from time import time
 from flask import Flask
-from flask.ext.restful import reqparse, abort, Api, Resource
+#from flask.ext.restful import reqparse, abort, Api, Resource
+from flask_restful import reqparse, abort, Api, Resource
+
+
 ##############################################################################
 #
 # Global Data Structure
@@ -491,7 +494,7 @@ def updateSDNConf():
 
 # Execute a generated command file or generate an exception
 def safeExecute(fileName):
-    os.chmod(fileName, 0755);
+    os.chmod(fileName, 755);
     p = subprocess.Popen(fileName)
     p.wait()
     return 0
@@ -619,7 +622,7 @@ def main(argv=None):
 
     if argv is None:
         argv = sys.argv
-    try:
+    else:
         try:
             opts, args = getopt.getopt(argv[1:], "hvn:m:w:o",
                                        ["help", "verbose", "names=", "children=", "parents=", "openstack"])
@@ -665,14 +668,6 @@ def main(argv=None):
         # start the server
         app.run(port=12345, debug=True)
 
-    except Usage, err:
-        print >>sys.stderr, err.msg
-        print >>sys.stderr, "for help use --help"
-        return 2
-
-    except LaaSFailure, err:
-        print >>sys.stderr, "-F- " + err.msg
-        return 3
-
 if __name__ == "__main__":
     sys.exit(main())
+

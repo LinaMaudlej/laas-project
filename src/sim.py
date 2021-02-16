@@ -26,7 +26,7 @@ import re
 import os
 import laas
 import heapq
-
+from functools import cmp_to_key
 from time import time
 
 class Job(object):
@@ -80,7 +80,7 @@ class RunningJobs:
 class SimFailure(Exception):
     def __init__(self, msg):
         self.msg = msg
-        print "Fail to handle some Simulation condition: %s" % msg
+        print ("Fail to handle some Simulation condition: %s" % msg)
 
 def cmp_by_arrival_n_id(j1,j2):
     a = j1.arrival - j2.arrival
@@ -120,9 +120,9 @@ class Sim(object):
                     length = int(m.group(4))
                     self.jobs.append(Job(id,N,arrival,length));
                 else:
-                    print "-W- parseJobsCsv: ignore line: (%d) %s" % \
-                       (lineNum , line)
-        print "-I- Obtained %d jobs" % len(self.jobs)
+                    print ("-W- parseJobsCsv: ignore line: (%d) %s" % \
+                       (lineNum , line))
+        print ("-I- Obtained %d jobs" % len(self.jobs))
         return 0
 
     def run(self):
@@ -143,7 +143,7 @@ class Sim(object):
         grps = laas.VecInt(1)
         while len(self.pending):
             if verbose: 
-                print "-I- At t=%d" % t
+                print ("-I- At t=%d" % t)
 
             # first clean all running jobs
             endT = self.running.minT() 
@@ -155,7 +155,7 @@ class Sim(object):
                         raise SimFailure(self.engine.getLastErrorMsg())
                     else:
                         if verbose: 
-                            print "-V- Remove %s" % j
+                            print ("-V- Remove %s" % j)
                 endT = self.running.minT() 
                 
             # now try placement of all jobs that already arrived
@@ -173,7 +173,7 @@ class Sim(object):
                         if self.firstJobWaiting < 0 and t > 0:
                             self.firstJobWaiting = t
                         if verbose: 
-                            print "-V- Fail   %s" % j
+                            print ("-V- Fail   %s" % j)
                 else:
                     # was placed:
                     hosts = laas.VecInt()
@@ -184,8 +184,8 @@ class Sim(object):
                     j.numL1UpLinks = l1Up.size()
                     j.numL2UpLinks = l2Up.size()*self.W[1]
                     if verbose: 
-                        print "-V- Place  %s %d hosts %d L1 %d L2" % \
-                            (j, j.actNumHosts, j.numL1UpLinks, j.numL2UpLinks) 
+                        print ("-V- Place  %s %d hosts %d L1 %d L2" % \
+                            (j, j.actNumHosts, j.numL1UpLinks, j.numL2UpLinks)) 
                     self.running.insert(t+j.length, j)
                     j.start = t
                     self.lastJobPlacement = t
@@ -208,10 +208,10 @@ class Sim(object):
 
     def analyze(self):
         if self.firstJobWaiting < 0:
-            print "-E- Can't provide analysis when no job waited"
+            print ("-E- Can't provide analysis when no job waited")
             return 1
-        print "-I- first waiting job at: %d lastJobPlacementTime %d" % \
-            (self.firstJobWaiting, self.lastJobPlacement)
+        print ("-I- first waiting job at: %d lastJobPlacementTime %d" % \
+            (self.firstJobWaiting, self.lastJobPlacement))
 
         numHosts = self.M[0] * self.M[1] * self.M[2]
         numL1UpLinks = self.M[2] * self.M[1] * self.W[1]
@@ -227,7 +227,7 @@ class Sim(object):
             potentialHostTime + potentialL1UpLinksTime + potentialL2UpLinksTime
         actualTotalLinksUsed = 0.0
 
-        print "-I- Total potential hosts * time = %g " % potentialHostTime
+        print ("-I- Total potential hosts * time = %g " % potentialHostTime)
         nJobs = 0
         skipLast = 0
         skipFirst = 0
@@ -257,18 +257,18 @@ class Sim(object):
             actualL2UpLinksUsed += runtime * j.numL2UpLinks;
             actualTotalLinksUsed += runtime * (j.actNumHosts + j.numL1UpLinks +  j.numL2UpLinks)
         # end of for
-        print "-I- Total considered jobs: %d skip first: %d last: %d" % \
-            (nJobs, skipFirst, skipLast)
-        print "-I- Total actual hosts * time = %g" % actualHostTime
+        print ("-I- Total considered jobs: %d skip first: %d last: %d" % \
+            (nJobs, skipFirst, skipLast))
+        print ("-I- Total actual hosts * time = %g" % actualHostTime)
         hl =  (100.0*actualHostTime)/potentialHostTime
-        print "-I- Host Utilization = %3.2f %%" % hl
+        print ("-I- Host Utilization = %3.2f %%" % hl)
         l1u = (100.0*actualL1UpLinksUsed)/potentialL1UpLinksTime
-        print "-I- L1 Up Links Utilization  = %3.2f %%" % l1u
+        print ("-I- L1 Up Links Utilization  = %3.2f %%" % l1u)
         l2u = (100.0*actualL2UpLinksUsed)/potentialL2UpLinksTime
-        print "-I- L2 Up Links Utilization  = %3.2f %%" % l2u
+        print ("-I- L2 Up Links Utilization  = %3.2f %%" % l2u)
         ltu = (100.0*actualTotalLinksUsed)/potentialTotalLinksTime
-        print "-I- Total Links Utilization  = %3.2f %%" % ltu
-        print "-I- Run Time = %3.3g sec" % self.runTime
+        print ("-I- Total Links Utilization  = %3.2f %%" % ltu)
+        print ("-I- Run Time = %3.3g sec" % self.runTime)
         return 0
 
 ###############################################################################
@@ -284,23 +284,23 @@ def main(argv=None):
     csvFileName = None
     M = laas.VecInt(3)
     W = laas.VecInt(3)
-
     if argv is None:
         argv = sys.argv
-    try:
-        try:
-            opts, args = getopt.getopt(argv[1:], 
-                                       "hvc:m:w:",
-                                       ["help", "verbose", "csv=",
-                                        "children=", "parents="])
-        except getopt.error, msg:
-             raise Usage(msg)
+        #try:
+        opts, args = getopt.getopt(argv[1:], 
+                                   "hvc:m:w:",
+                                   ["help", "verbose", "csv=",
+                                    "children=", "parents="])
+        #except getopt.error, msg:
+        #     raise Usage(msg)
+
         for opt, arg in opts:
             if opt in ('-h', "--help"):
-                print 'sim.py -c|--csv <csvFile> -m|--children m1,m2,m3' \
-                    '-w|--parents 1,w2,w3'
+                print ('sim.py -c|--csv <csvFile> -m|--children m1,m2,m3' \
+                    '-w|--parents 1,w2,w3')
                 sys.exit()
             elif opt in ("-c", "--csv"):
+
                 csvFileName = arg
             elif opt in ("-v", "--verbose"):
                 verbose = True
@@ -320,14 +320,16 @@ def main(argv=None):
         sim.run()
         sim.analyze()
 
-    except Usage, err:
-        print >>sys.stderr, err.msg
-        print >>sys.stderr, "for help use --help"
-        return 2
+    #except Usage, err:
+        print(err.msg)
+        #print >>sys.stderr, err.msg
+        #print >>sys.stderr, "for help use --help"
+    #    return 2
 
-    except SimFailure, err:
-        print >>sys.stderr, "-F- " + err.msg
-        return 3
+    #except SimFailure, err:
+        print(err.msg)
+        #print >>sys.stderr, "-F- " + err.msg
+    #    return 3
 
 if __name__ == "__main__":
     sys.exit(main())
