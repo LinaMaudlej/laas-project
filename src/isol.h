@@ -29,6 +29,8 @@
 #include "portmask.h"
 #include "ft3.h"
 
+//extern bool isolation;
+
 class JobSetting {
   int A,B,C,D,R,S,Q;
  public:
@@ -60,6 +62,7 @@ class IsolAlgo {
   // So all 0..n-1 L3's are connected to the first L2 in each of the sub-trees
   std::vector< PortMask > L1FreeDnPorts; 
   std::vector< PortMask > L1FreeUpPorts; 
+  std::vector< PortMask > L1FreeUpPorts_v2; 
   std::vector< PortMask > L2FreeUpPorts;
   std::map<int, std::map< int, std::list< int > > > L1DnPortsByJob;
   std::map<int, std::map< int, std::list< int > > > L1UpPortsByJob;

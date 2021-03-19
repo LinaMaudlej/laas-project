@@ -46,7 +46,10 @@ public:
   size_t getBits(bool v, std::vector<unsigned int> &bitIdxs) const;
   PortMask &operator&=(const PortMask &rhs); // assign and
   PortMask &operator&=(const unsigned long val); // assign and
+  std::vector< PortMask >* L1FreeUpPorts_result;
   PortMask operator&(const PortMask &rhs); // Bitwise and
+  PortMask operator|(const PortMask &rhs); // Bitwise and
+
 };
 std::ostream& operator<<(std::ostream& out, const PortMask &pm);
 

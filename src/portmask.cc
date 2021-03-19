@@ -85,6 +85,17 @@ PortMask PortMask::operator &(const PortMask &rhs)
   return PortMask(numBits, value & rhs.value);
 }
 
+PortMask PortMask::operator |(const PortMask &rhs)
+{
+  if (numBits != rhs.numBits) {
+    cerr << "BUG: can't bitwaise and PortMask of different length:" 
+         << numBits << " vs. " << rhs.numBits << endl;
+    exit(1);
+  }
+  return PortMask(numBits, value | rhs.value);
+}
+
+
 // assign and
 PortMask &PortMask::operator&=(const PortMask &rhs)
 {

@@ -25,6 +25,9 @@
 #include <sstream>
 #include <iomanip>
 #include <bitset>
+std::vector< PortMask > L1FreeUpPorts_result;
+
+bool isolation=true;
 
 string
 JobSetting::str() 
@@ -72,6 +75,10 @@ IsolAlgo::setFatTree(ThreeLevelFatTree *f)
   PortMask fullL1Mask(ft->W2,0);
   fullL1Mask.setAll();
   L1FreeUpPorts.resize(ft->M3 * ft->M2, fullL1Mask);
+  L1FreeUpPorts_v2.resize(ft->M3 * ft->M2, fullL1Mask);
+
+  L1FreeUpPorts_result.resize(ft->M3 * ft->M2, fullL1Mask);
+
 
   // NOTE: we only need a single Bipartite! So we only have 
   // M3 such leafs on a single bipartite.
@@ -160,6 +167,7 @@ IsolAlgo::initAllocations( vector<int> &l1Allocations,
   PortMask emptyL1Mask(ft->W2,0);
   jobL1UpPorts.clear();
   jobL1UpPorts.resize(L1FreeUpPorts.size(), emptyL1Mask);
+
 
   PortMask emptyL2Mask(ft->W3,0);
   jobL2UpPorts.clear();
@@ -359,6 +367,7 @@ string s2str(const set<int> &v)
   return out.str();
 }
 
+
 // given that we search for single L2 sub-tree placement find it
 bool
 IsolAlgo::placeL2SubTrees(int A, int B, int R,
@@ -400,12 +409,19 @@ IsolAlgo::placeL2SubTrees(int A, int B, int R,
     repeatedLeafs.clear();
     PortMask portMask(ft->W2, 0);
     portMask.setAll();
-
+    std::vector< PortMask >* L1FreeUpPorts_tmp;
+    L1FreeUpPorts_tmp=&L1FreeUpPorts; //TODO: individual isolation is required (and between them).
+    if(isolation==false){
+	   	for (size_t i = 0; i < L1FreeUpPorts.size(); i++) {
+		(L1FreeUpPorts_result)[i]= L1FreeUpPorts[i] | L1FreeUpPorts_v2[i];
+	}
+		L1FreeUpPorts_tmp=&L1FreeUpPorts_result;
+    }
     if (findCommonSpineLeafs(
                              // CONSTS 
                              &ft->L1SubTreeByIdx, // free hosts per L1 leaf
-                             &L1FreeUpPorts, // free ports per L1 leaf
-                             A,
+                             L1FreeUpPorts_tmp, // free ports per L1 leaf
+			     A,
                              B,  // if <= 0 no unique leafs
                              R,
                              neededAPorts, // needed A ports (may be < A)
@@ -805,6 +821,13 @@ IsolAlgo::recordAllocation(int jobId,
   if (!noLinkAlloc) {
     for (size_t l = 0; l < jobL1UpPorts.size(); l++) {
       unsigned long usedPorts = jobL1UpPorts[l].get();
+
+      if(isolation==false){
+        //update v2 
+        L1FreeUpPorts_v2[l] &= ~(usedPorts & ~(L1FreeUpPorts[l].get()));
+      }else{
+        L1FreeUpPorts_v2[l] &= ~usedPorts;
+      }
       L1FreeUpPorts[l] &= ~usedPorts;
       for (int p = 0; p < ft->W2; p++) {
         if (jobL1UpPorts[l].getBit(p)) {
@@ -872,8 +895,17 @@ IsolAlgo::completeJob(int jobId, int numHosts)
       list< int >::iterator pI;
       for (pI = (*lI).second.begin(); pI != (*lI).second.end(); pI++) {
         int p = (*pI);
-        L1FreeUpPorts[l].setBit(p,1);
-        numLinks++;
+	if(isolation==false){
+	  if(L1FreeUpPorts[l].getBit(p)){
+		 L1FreeUpPorts_v2[l].setBit(p,1);
+	   }else{
+		 L1FreeUpPorts[l].setBit(p,1);
+	   }  
+	}else{
+	  L1FreeUpPorts_v2[l].setBit(p,1);
+	  L1FreeUpPorts[l].setBit(p,1);
+	}
+           numLinks++;
       }
     }
   }
