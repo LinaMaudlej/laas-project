@@ -29,7 +29,7 @@
 #include "portmask.h"
 #include "ft3.h"
 
-//extern bool isolation;
+extern bool isolation;
 
 class JobSetting {
   int A,B,C,D,R,S,Q;

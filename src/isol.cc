@@ -27,7 +27,7 @@
 #include <bitset>
 std::vector< PortMask > L1FreeUpPorts_result;
 
-bool isolation=true;
+bool isolation=false;
 
 string
 JobSetting::str() 
