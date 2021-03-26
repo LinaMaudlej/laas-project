@@ -106,7 +106,7 @@ class Sim(object):
         self.firstJobWaiting = -1
         self.runTime = 0
     def parseJobsCsv(self,csvFileName):
-        jobRex = re.compile('^(\d+)[\s,]+(\d+)[\s,]+(\d+)[\s,]+(\d+)\s*$')
+        jobRex = re.compile('^(\d+)[\s,]+(-?(\d+))[\s,]+(\d+)[\s,]+(\d+)\s*$')
         self.jobs = []
         lineNum = 0
         with open(csvFileName) as f:
@@ -116,8 +116,9 @@ class Sim(object):
                 if m is not None:
                     id = int(m.group(1))
                     N = int(m.group(2))
-                    arrival = int(m.group(3))
-                    length = int(m.group(4))
+                    arrival = int(m.group(4))
+                    length = int(m.group(5))
+                    print "N is ",arrival
                     self.jobs.append(Job(id,N,arrival,length));
                 else:
                     print "-W- parseJobsCsv: ignore line: (%d) %s" % \

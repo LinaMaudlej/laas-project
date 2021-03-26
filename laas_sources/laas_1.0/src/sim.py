@@ -113,6 +113,7 @@ class Sim(object):
             for line in f:
                 lineNum += 1
                 m = jobRex.match(line)
+                print m
                 if m is not None:
                     id = int(m.group(1))
                     N = int(m.group(2))

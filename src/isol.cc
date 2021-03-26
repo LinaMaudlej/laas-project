@@ -27,7 +27,7 @@
 #include <bitset>
 std::vector< PortMask > L1FreeUpPorts_result;
 
-bool isolation=false;
+bool isolation=true;
 
 string
 JobSetting::str() 
@@ -97,9 +97,21 @@ bool
 IsolAlgo::placeJob(int jobId, int numHosts) {
   int A, B, C, D, R, S, Q;
 
+  
+/*
+ * if the numHosts <0 then the isolation is not required. 
   if (numHosts <= 0) 
     return true;
+*/
+  if(numHosts==0){
 
+	return true;
+  }
+  isolation=true;
+  if(numHosts<0){
+	isolation=false;
+	numHosts=numHosts*(-1);
+  }
   if (verbose) {
     log << "----------------------------------------------------" << endl;
     log << "VERB handling job:" << jobId << " size:" 
@@ -410,11 +422,16 @@ IsolAlgo::placeL2SubTrees(int A, int B, int R,
     PortMask portMask(ft->W2, 0);
     portMask.setAll();
     std::vector< PortMask >* L1FreeUpPorts_tmp;
-    L1FreeUpPorts_tmp=&L1FreeUpPorts; //TODO: individual isolation is required (and between them).
+   
     if(isolation==false){
 	   	for (size_t i = 0; i < L1FreeUpPorts.size(); i++) {
 		(L1FreeUpPorts_result)[i]= L1FreeUpPorts[i] | L1FreeUpPorts_v2[i];
 	}
+		L1FreeUpPorts_tmp=&L1FreeUpPorts_result;
+    }else{
+	   	for (size_t i = 0; i < L1FreeUpPorts.size(); i++) {
+		(L1FreeUpPorts_result)[i]= L1FreeUpPorts[i] & L1FreeUpPorts_v2[i];
+		}
 		L1FreeUpPorts_tmp=&L1FreeUpPorts_result;
     }
     if (findCommonSpineLeafs(
@@ -602,6 +619,7 @@ IsolAlgo::possiblePlacement(int N,
                             int &A, int &B, int &C, int &D, 
                             int &R, int &S, int &Q)
 {
+
   // We simply try to allocate in as less sub-trees as we can:
 
   // first we try on single L2 tree: N=RA+B
@@ -823,9 +841,10 @@ IsolAlgo::recordAllocation(int jobId,
       unsigned long usedPorts = jobL1UpPorts[l].get();
 
       if(isolation==false){
-        //update v2 
+        //update v2, use on of the ports (reset, make it available) 
         L1FreeUpPorts_v2[l] &= ~(usedPorts & ~(L1FreeUpPorts[l].get()));
       }else{
+	//use both ports
         L1FreeUpPorts_v2[l] &= ~usedPorts;
       }
       L1FreeUpPorts[l] &= ~usedPorts;

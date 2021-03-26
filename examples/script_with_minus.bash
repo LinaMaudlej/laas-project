@@ -8,7 +8,7 @@ cur_num=$number_minus
 
 while read line; do	
 	echo $line | cut -d"," -f1 | tr -d $'\n'
-	echo -n  ","
+	echo -n  ", "
 	if (( cur_num !=  0  && cur_skip == 0 ))
 	then
 		echo $line | cut -d"," -f2 | awk '{print "-"$1}' | tr -d $'\n'
