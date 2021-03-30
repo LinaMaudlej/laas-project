@@ -249,6 +249,7 @@ LaaS::assignTenant(int tenantId,
 		unsigned l1UpPn = l1UpPorts[i].second;
 
 		if(isolation==false){
+			print "here1"
 			if (alg->L1FreeUpPorts.size() <= l1Idx &&  alg->L1FreeUpPorts_v2.size() <= l1Idx) {
 				lastErrorMsg << "Provided switch index of l1UpPorts[" << i << "] = switch: " 
 					<< l1Idx <<  " which is > " 
@@ -262,6 +263,8 @@ LaaS::assignTenant(int tenantId,
 				return 1;
 			}
 		}else{
+			print "here2"
+
 			if (alg->L1FreeUpPorts.size() <= l1Idx || alg->L1FreeUpPorts_v2.size() <= l1Idx) {
 				lastErrorMsg << "Provided switch index of l1UpPorts[" << i << "] = switch: " 
 					<< l1Idx <<  " which is > " 
@@ -304,6 +307,8 @@ LaaS::assignTenant(int tenantId,
 		unsigned l1Idx = l1UpPorts[i].first;
 		unsigned l1UpPn = l1UpPorts[i].second;
 		if (isolation==false){
+			print "here3"
+
 			if(alg->L1FreeUpPorts[l1Idx].getBit(l1UpPn)){
 				alg->L1FreeUpPorts[l1Idx].setBit(l1UpPn, false);
 
@@ -311,6 +316,8 @@ LaaS::assignTenant(int tenantId,
 				alg->L1FreeUpPorts_v2[l1Idx].setBit(l1UpPn, false);
 			}
 		}else{
+			print "here4"
+
 			alg->L1FreeUpPorts[l1Idx].setBit(l1UpPn, false);
 			alg->L1FreeUpPorts_v2[l1Idx].setBit(l1UpPn, false);
 
@@ -353,6 +360,8 @@ LaaS::getUnAllocated(std::vector<int> &hosts,          // OUT Host IDs
 		size_t nSet_v2 = alg->L1FreeUpPorts_v2[i].getBits(true, setBits_v2);
 		int flag_setBits=0;
 		if(isolation==false){
+			print "here5"
+
 			for (size_t j1 = 0; j1 < setBits.size() ; j1++) {
 				for(size_t j2=0 ; j2<setBits_v2.size() ;j2++){
 					if(setBits[j1] == setBits_v2[j2]){
@@ -366,6 +375,8 @@ LaaS::getUnAllocated(std::vector<int> &hosts,          // OUT Host IDs
 				flag_setBits=0;
 			}
 		}else{
+			print "here6"
+
 			for (size_t j1 = 0; j1 < setBits.size() ; j1++) {
 				for(size_t j2=0 ; j2<setBits_v2.size() ;j2++){
 					if(setBits[j1] == setBits_v2[j2]){

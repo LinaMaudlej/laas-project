@@ -106,6 +106,7 @@ class Sim(object):
         self.firstJobWaiting = -1
         self.runTime = 0
     def parseJobsCsv(self,csvFileName):
+        #changed with minus
         jobRex = re.compile('^(\d+)[\s,]+(-?(\d+))[\s,]+(\d+)[\s,]+(\d+)\s*$')
         self.jobs = []
         lineNum = 0
@@ -118,8 +119,8 @@ class Sim(object):
                     N = int(m.group(2))
                     arrival = int(m.group(4))
                     length = int(m.group(5))
-                    print "N is ",arrival
                     self.jobs.append(Job(id,N,arrival,length));
+                    print (N,arrival,length)
                 else:
                     print "-W- parseJobsCsv: ignore line: (%d) %s" % \
                        (lineNum , line)
@@ -168,7 +169,7 @@ class Sim(object):
                 placeFailed = self.engine.allocTenant(j.id, grps)
                 if placeFailed:
                     if not self.running.len():
-                        err = "No job running but fail to place job %s" % j
+                        err = "No job running but fail to place job %s" % j 
                         raise SimFailure(err)
                     else:
                         if self.firstJobWaiting < 0 and t > 0:
