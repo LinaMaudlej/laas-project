@@ -474,8 +474,8 @@ class LaaS(object):
     def getTenantAlloc(self, tenantId, hosts, l1UpPorts, l2UpPorts):
         return _laas.LaaS_getTenantAlloc(self, tenantId, hosts, l1UpPorts, l2UpPorts)
 
-    def allocTenant(self, tenantId, GroupHosts):
-        return _laas.LaaS_allocTenant(self, tenantId, GroupHosts)
+    def allocTenant(self, tenantId, GroupHosts, isolation):
+        return _laas.LaaS_allocTenant(self, tenantId, GroupHosts, isolation)
 
     def assignTenant(self, tenantId, hosts, l1UpPorts, l2UpPorts):
         return _laas.LaaS_assignTenant(self, tenantId, hosts, l1UpPorts, l2UpPorts)

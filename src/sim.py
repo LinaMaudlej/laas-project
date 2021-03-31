@@ -30,16 +30,17 @@ import heapq
 from time import time
 
 class Job(object):
-    def __init__(self, id, N, arrival, length):
+    def __init__(self, id, N, arrival, length,isolation):
         self.id = id
         self.N = N
         self.arrival = arrival
         self.length = length
         self.start = -1
+        self.isolation=isolation
 
     def __str__(self):
-        return "job id=%d N=%d len=%d start= %d" % \
-            (self.id, self.N, self.length, self.start)
+        return "job id=%d N=%d len=%d start= %d  isolation= %d" % \
+            (self.id, self.N, self.length, self.start,self.isolation)
 
     def start(self, t):
         self.start = t
@@ -107,7 +108,7 @@ class Sim(object):
         self.runTime = 0
     def parseJobsCsv(self,csvFileName):
         #changed with minus
-        jobRex = re.compile('^(\d+)[\s,]+(-?(\d+))[\s,]+(\d+)[\s,]+(\d+)\s*$')
+        jobRex = re.compile('^(\d+)[\s,]+(\d+)[\s,]+(\d+)[\s,]+(\d+)[\s,]+(\d+)\s*$')
         self.jobs = []
         lineNum = 0
         with open(csvFileName) as f:
@@ -117,10 +118,11 @@ class Sim(object):
                 if m is not None:
                     id = int(m.group(1))
                     N = int(m.group(2))
-                    arrival = int(m.group(4))
-                    length = int(m.group(5))
-                    self.jobs.append(Job(id,N,arrival,length));
-                    print (N,arrival,length)
+                    arrival = int(m.group(3))
+                    length = int(m.group(4))
+                    isolation=int(m.group(5))
+                    #print(N,arrival,length,isolation)
+                    self.jobs.append(Job(id,N,arrival,length,isolation));
                 else:
                     print "-W- parseJobsCsv: ignore line: (%d) %s" % \
                        (lineNum , line)
@@ -166,7 +168,7 @@ class Sim(object):
             while not placeFailed and j.arrival <= t:
                 grps[0] = j.N
                 # the engine returns 0 for success!
-                placeFailed = self.engine.allocTenant(j.id, grps)
+                placeFailed = self.engine.allocTenant(j.id, grps,j.isolation)
                 if placeFailed:
                     if not self.running.len():
                         err = "No job running but fail to place job %s" % j 

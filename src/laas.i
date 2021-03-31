@@ -83,7 +83,7 @@ class LaaS {
 
   // try to allocate the tenant
   int allocTenant(int tenantId,
-                  std::vector<int> &GroupHosts); // IN number of hosts per each leaf group index
+                  std::vector<int> &GroupHosts, int isolation); // IN number of hosts per each leaf group index
   
   // manually assign tenant resources
   int assignTenant(int tenantId,
